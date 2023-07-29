@@ -4,4 +4,4 @@ require('@babel/register')({
         ['@babel/preset-react']
     ]
 })
-require('./dashboard')
+require('./client')

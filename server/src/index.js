@@ -2,15 +2,40 @@ import * as screens from './screens'
 import express from 'express'
 import bodyParser from 'body-parser'
 
-// init all screens
-const Screens = {}, Screen4Client = {}; 
+// helper methods
+const ScreensCache = {}; 
+const getScreenData = async(screen, data={}) => {
+    const data_ = JSON.stringify(data);
+    if (ScreensCache[screen+data_]) return ScreensCache[screen+data_];
+    const screenData = new screens[screen](data);
+    await screenData._init();
+    const info_ = screenData._getScreenData();
+    if (!info_.invalid) {
+        ScreensCache[screen+data_] = info_;
+        return ScreensCache[screen+data_];
+    } else {
+        // if data was invalid, we don't cache it, and redirect if requested
+        if (info_.meta && info_.meta.screen) {
+            console.log('!request was invalid; redirect detected to',info_.meta.screen,'with data',info_.meta.data);
+            const red = await getScreenData(info_.meta.screen, info_.meta.data);
+            red.redirected_from = screen;
+            return red;
+        } else {
+            // data was invalid and no redirect requested, return as it was
+            return info_;
+        }
+    }
+    //screenData._init();
+};
+
+/*
 for (let screen in screens) {
     const xx = new screens[screen]();
     await xx._init();
     Screens[screen] = xx._getScreenData();
     Screen4Client[screen] = xx._getScreenData();
     Screen4Client[screen].serverFunctions = Object.keys(Screen4Client[screen].serverFunctions);
-}
+}*/
 //console.log('Screens data',Screens);
 
 // init express
@@ -30,7 +55,7 @@ router.get('/', async(req, res) => {
     const pkg = require('../package.json');
     res.send({
         version: pkg.version,
-        screens: Object.keys(Screens),
+        screens: Object.keys(screens),
         startScreen: 'Login'
     });
 });
@@ -40,9 +65,30 @@ router.get('/screen/:screenName', async(req, res) => {
     const { screenName } = req.params;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress 
     console.log(`[from ${ip}] Requested info for screen ${screenName}`);
-    const screen = Screen4Client[screenName];
-    if (screen) {
-        res.send(screen);
+    //
+    let data = await getScreenData(screenName, {});
+    // remove server functions; just return the list of func names
+    data.serverFunctions = Object.keys(data.serverFunctions);
+    //
+    if (data) {
+        res.send(data);
+    } else {
+        res.status(404).send({ error: 'Screen not found' });
+    }
+});
+
+// get given screen definition with data
+router.post('/screen/:screenName', async(req, res) => {
+    const { screenName } = req.params;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress 
+    console.log(`[from ${ip}] Requested info for screen ${screenName} with data`,req.body);
+    //
+    let data = await getScreenData(screenName, req.body);
+    // remove server functions; just return the list of func names
+    data.serverFunctions = Object.keys(data.serverFunctions);
+    //
+    if (data) {
+        res.send(data);
     } else {
         res.status(404).send({ error: 'Screen not found' });
     }

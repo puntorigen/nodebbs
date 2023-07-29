@@ -54,7 +54,7 @@ export class Login extends Screen {
                         // this triggers a call to the server (all this.server methods are awaited automatically)
                         const check = this.server.validateLoginForm({ username, password })
                         if (check.success) {
-                            this.navigate(check.nextScreen, { message: check.message });
+                            this.navigate(check.nextScreen, { token:'validated', message: check.message });
                         }
                         //redirect to another screen (makes client request given page to server)
                         //this.navigate("MainMenu",{} ); //optionally you can pass data to the next screen, which is assigned as this.data
@@ -91,10 +91,3 @@ export class Login extends Screen {
     }
 
 }
-
-/*
-export const LoginScreen = {
-    component,
-    name: "LoginScreen",
-    events: { validateLoginForm }
-};*/

@@ -43,7 +43,8 @@ export class Screen {
         this._serverFunctions = {};
         this._customComponents = {};
         this._processReadyFlag = false; 
-        this._init();
+        this._invalid = null;
+        //this._init();
     }
 
     async _init() {
@@ -51,6 +52,8 @@ export class Screen {
         await this._process();
         this._processReadyFlag = true;
     }
+
+    async server() { return {}; }
 
     async _extractAssets() {
         // transform assets into a map of asset name to compressed asset data
@@ -195,6 +198,7 @@ export class Screen {
 
     _getScreenData() {
         // return data to /index.js
+        if (this._invalid) return { invalid: true, meta:this._invalid };
         return {
             layout: this.__layout, // layout as string
             //layoutObj: this._layout, // layout as obj
@@ -205,7 +209,13 @@ export class Screen {
             clientFunctions: this._clientFunctions, // custom client methods defined on screen
             serverFunctions: this._serverFunctions, // custom server methods defined on screen; to be called from express post route
             customComponents: this._customComponents, // custom components imported & used on screen layout
+            data: this.data // data passed from previous screen
         };
+    }
+
+    navigate(screen, data) {
+        // handle virtual navigation from constructor, so if invalid request we return another screen
+        this._invalid = { screen, data };
     }
 
 }
