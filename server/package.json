@@ -30,6 +30,7 @@
     "react-element-to-jsx-string": "^15.0.0",
     "react-jsx-parser": "^1.29.0",
     "react-serialize": "^0.2.1",
+    "simple-encryptor": "^4.0.0",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
   },

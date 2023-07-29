@@ -196,6 +196,10 @@ export class Screen {
         //console.log('client functions',dump(clientFunctions));
     }
 
+    _getServerFunctions() {
+        return this._serverFunctions;
+    }
+    
     _getScreenData() {
         // return data to /index.js
         if (this._invalid) return { invalid: true, meta:this._invalid };
