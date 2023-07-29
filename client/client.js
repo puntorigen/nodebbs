@@ -19,7 +19,7 @@ const App = () => {
 const screen = blessed.screen({
     autoPadding: true,
     smartCSR: true,
-    title: 'react-blessed hello world'
+    title: 'NodeBBS Terminal Client'
 })
 
 screen.key(['escape', 'q', 'C-c'], () => process.exit(0))

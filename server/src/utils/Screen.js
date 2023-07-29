@@ -209,7 +209,7 @@ export class Screen {
             clientFunctions: this._clientFunctions, // custom client methods defined on screen
             serverFunctions: this._serverFunctions, // custom server methods defined on screen; to be called from express post route
             customComponents: this._customComponents, // custom components imported & used on screen layout
-            data: this.data // data passed from previous screen
+            //data: this.data // data passed from previous screen
         };
     }
 

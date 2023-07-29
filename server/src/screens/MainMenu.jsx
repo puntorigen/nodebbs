@@ -14,7 +14,7 @@ export class MainMenu extends Screen {
             this.navigate("Login",{});
         } else if (this.data.token!='test') {
             // you can validate the token here, and if invalid redirect the user before rendering
-            this.navigate("Login",{});
+            this.navigate("NoAuth",{ from: "MainMenu" });
         }
     }
 
