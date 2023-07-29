@@ -147,12 +147,10 @@ export class Screen {
         for (let key in this._customComponents) {
             // get the source code for that component from ../components dir
             const src = path.join(process.cwd(),'/src/components/',key+'.jsx');
-            // check if file exists using fs.access
             const exists = await fs.access(src).then(()=>true).catch(()=>false);
             if (exists) {
                 // read file contents
                 const data = await fs.readFile(src);
-                // add to acc
                 this._customComponents[key] = data.toString();
             }
         };
@@ -162,7 +160,7 @@ export class Screen {
         await this._extractCustomComponents();
         const inspect = require('util').inspect;
         const dump = (data)=>inspect(data, { depth: null });
-        console.log('layout',dump(this._layout));
+        //console.log('layout',dump(this._layout));
         //console.log('assets',Object.keys(this.assets).map((key)=>({key,bytes:this.assets[key].length }))); //.dump(this.assets));
         //console.log('state',dump(this.state));
         //console.log('functions',dump(this.functions));
@@ -193,14 +191,13 @@ export class Screen {
             return acc;
         },{});
         //console.log('client functions',dump(clientFunctions));
-        //
     }
 
     _getScreenData() {
         // return data to /index.js
         return {
             layout: this.__layout, // layout as string
-            layoutObj: this._layout, // layout as obj
+            //layoutObj: this._layout, // layout as obj
             assets: this.assets,  // map of asset name to compressed asset data
             state: this.state, // initial state declared on screen
             functions: this.functions, // inplace client functions declared on layout
