@@ -3,15 +3,11 @@ import React from 'react';
 import { Screen } from '../utils/Screen'; 
 import { test } from 'components/test.jsx'
 
-import { serialize, deserialize } from "react-serialize"
-
 export class Login extends Screen {
 
     constructor(data) {
         super(data); //data is the data passed from the previous screen, if any; this.data
         this.state = { count: 0 };
-        console.log('test2',serialize(test({ name:'Pedro' })));
-        console.log('test2',serialize(test()));
     }
 
     componentDidMount() {
@@ -44,10 +40,10 @@ export class Login extends Screen {
             <box label="Login" border={{ type: 'line' }} style={{ border: { fg: 'blue' } }}>
                 <form id="loginForm">
                     <test name="Pepito" />
-                    <label>Count: [this.state.count]</label>
-                    <label>Username:</label>
+                    <text>Count: [this.state.count]</text>
+                    <text>Username:</text>
                     <textbox name="username" id="usernameInput" />
-                    <label>Password:</label>
+                    <text>Password:</text>
                     <textbox name="password" type="password" id="passwordInput" />
                     <button type="submit" id="submitButton" onClick={()=>{
                         // this runs on the client terminal

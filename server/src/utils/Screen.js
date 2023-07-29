@@ -4,6 +4,7 @@ import LZString from 'lz-string';
 
 //import React from 'react';
 import blessed from 'blessed';
+import blessed_contrib from 'blessed-contrib';
 //import { render } from 'react-blessed'
 
 export class Screen {
@@ -40,6 +41,7 @@ export class Screen {
         this.data = data;
         this._clientFunctions = {};
         this._serverFunctions = {};
+        this._customComponents = {};
         this._processReadyFlag = false; 
         this._init();
     }
@@ -113,19 +115,54 @@ export class Screen {
     }
 
     async _extractCustomComponents() {
+        const fs = require('fs').promises, path = require('path');
         // extract and export custom components code, for client to use
-        // traverse the this._layout tree for 'type' key values
-        // detect type value keys that are not within react-blessed tags
         // get the value of those keys, and add the function code toString as value for each key
-        const blessedKeys = Object.keys(blessed);
-        console.log('blessed tags',blessedKeys);
+        // filter only the keys that start with an uppercase letter
+        const blessedKeys = Object.keys(blessed).filter(x=>x[0]===x[0].toUpperCase());
+        const _blessedKeys = blessedKeys;
+        // get blessed_contrib keys as well, and merge with blessedKeys obj
+        Object.keys(blessed_contrib).filter(x=>x[0]===x[0].toUpperCase()).forEach((key)=>blessedKeys[key]=key);
+        // lowercase all blessedKeys
+        blessedKeys.forEach((key,i)=>blessedKeys[i]=key.toLowerCase());
+        //console.log('blessed & contrib tags',blessedKeys);
+        // traverse the this._layout tree for 'type' key values
+        // detect type value keys that are not within blessedKeys keys
+        const traverse = async (obj) => {
+            for (let key in obj) {
+                if (obj[key] && typeof obj[key] === 'object') {
+                    if (typeof obj[key].type === 'string' && obj[key].props) {
+                        if (!blessedKeys.includes(obj[key].type)) {
+                            // add to customComponents
+                            this._customComponents[obj[key].type] = obj[key].type;
+                        }
+                    }
+                    await traverse(obj[key]);
+                }
+            }
+        }
+        await traverse(this._layout);
+        // for each this._customComponents key, get the source code for that component
+        // and add it to this._customComponents as value, iterate using for
+        for (let key in this._customComponents) {
+            // get the source code for that component from ../components dir
+            const src = path.join(process.cwd(),'/src/components/',key+'.jsx');
+            // check if file exists using fs.access
+            const exists = await fs.access(src).then(()=>true).catch(()=>false);
+            if (exists) {
+                // read file contents
+                const data = await fs.readFile(src);
+                // add to acc
+                this._customComponents[key] = data.toString();
+            }
+        };
     }
 
     async _process() {
         await this._extractCustomComponents();
         const inspect = require('util').inspect;
         const dump = (data)=>inspect(data, { depth: null });
-        //console.log('layout',dump(this._layout));
+        console.log('layout',dump(this._layout));
         //console.log('assets',Object.keys(this.assets).map((key)=>({key,bytes:this.assets[key].length }))); //.dump(this.assets));
         //console.log('state',dump(this.state));
         //console.log('functions',dump(this.functions));
@@ -170,6 +207,7 @@ export class Screen {
             lifecycle: this.lifecycle, // lifecycle events, to run on the client
             clientFunctions: this._clientFunctions, // custom client methods defined on screen
             serverFunctions: this._serverFunctions, // custom server methods defined on screen; to be called from express post route
+            customComponents: this._customComponents, // custom components imported & used on screen layout
         };
     }
 

@@ -10,6 +10,7 @@ const App = () => {
             width="50%"
             height="50%"
             border={{ type: 'line' }}
+            label='hola'
             style={{ border: { fg: 'blue' } }}
         >Hello World!</box>
     )
