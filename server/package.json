@@ -4,7 +4,7 @@
   "description": "NodeBBS Server",
   "main": "index.js",
   "scripts": {
-    "dev": "npm run build && node dist/bundle.js",
+    "dev": "npm run build && clear && node dist/bundle.js",
     "start": "node dist/bundle.js",
     "build": "webpack",
     "postinstall": "patch-package"

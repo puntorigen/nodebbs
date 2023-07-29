@@ -25,18 +25,7 @@ const getScreenData = async(screen, data={}) => {
             return info_;
         }
     }
-    //screenData._init();
 };
-
-/*
-for (let screen in screens) {
-    const xx = new screens[screen]();
-    await xx._init();
-    Screens[screen] = xx._getScreenData();
-    Screen4Client[screen] = xx._getScreenData();
-    Screen4Client[screen].serverFunctions = Object.keys(Screen4Client[screen].serverFunctions);
-}*/
-//console.log('Screens data',Screens);
 
 // init express
 const app = express();
@@ -53,10 +42,12 @@ router.get('/', async(req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress 
     console.log(`[from ${ip}] NodeBBS info requested`);
     const pkg = require('../package.json');
+    const nbbs = require('../nodebbs.json');
     res.send({
         version: pkg.version,
+        description: (nbbs.description)?nbbs.description:pkg.description,
         screens: Object.keys(screens),
-        startScreen: 'Login'
+        meta: nbbs
     });
 });
 

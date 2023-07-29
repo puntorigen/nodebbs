@@ -1,0 +1,6 @@
+{
+    "name": "The Demo BBS",
+    "sysop": "Pablo",
+    "description": "NodeJS based BBS server demo",
+    "startScreen": "Login"
+}
