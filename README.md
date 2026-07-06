@@ -9,8 +9,8 @@ Dial into an ANSI BBS from your terminal, like it's 1994.
 `nodebbs` is a retro bulletin board system in three parts:
 
 - **server/** holds all the session logic and streams raw **ANSI/VT100 bytes** to callers over a WebSocket.
-- **client/** is a thin CLI "modem": it plays a dial-up sound, throttles the incoming bytes to a **simulated baud rate**, and forwards your keystrokes back to the server.
-- **web/** is a Next.js browser client (deployable to Vercel) that renders the same stream in an `xterm.js` terminal wrapped in a **CRT monitor** — scanlines, phosphor glow, curvature, flicker, and synthesized tube hum + degauss thunk.
+- **client/** is a thin CLI "modem": it synthesizes a **baud-dependent dial-up handshake** (dial tone, DTMF, ringback, carrier negotiation), throttles the incoming bytes to a **simulated baud rate**, and forwards your keystrokes back to the server.
+- **web/** is a Next.js browser client (deployable to Vercel) that renders the same stream in an `xterm.js` terminal wrapped in a **CRT monitor** — scanlines, phosphor glow, curvature, flicker, plus synthesized tube hum, degauss thunk, and the same per-baud modem handshake.
 
 Because the server just streams bytes and each client just prints them, colored ASCII, cursor animations, live presence counts, and multi-user chat all work with no special client support.
 
@@ -59,6 +59,8 @@ node client/index.js --baud 0                     # full speed (no throttle)
 ```
 
 While connected, press **Ctrl+]** (or Ctrl+C) to hang up. You'll get a satisfying `NO CARRIER`.
+
+The dial-up sound isn't a recording — it's synthesized per baud, modeled on the real standards, and the `CONNECT` banner lands when the handshake finishes. 300 baud (Bell 103) is short and pure; 1200/2400 add scramble and training warbles; 9600 (V.32) adds echo-canceller probing; `--baud 0` gets the full V.34-style drama with the long training hiss.
 
 ### First call
 
@@ -136,9 +138,9 @@ server/src/
     games/hilo.js games/tictactoe.js
 
 client/
-  index.js          Dialer: modem sound, CONNECT banner, raw stdin bridge
+  index.js          Dialer: handshake audio, CONNECT banner, raw stdin bridge
   lib/throttle.js   Baud-rate byte drainer (baud / 10 bytes per second)
-  assets/dial-up.mp3
+  lib/modem.js      Per-baud handshake synthesizer + WAV encoder
 
 web/
   app/page.js               Dialer UI (server/baud/sound) + connected view
@@ -146,7 +148,8 @@ web/
   components/CrtTerminal.js xterm bridge: WebSocket, baud throttle, 80-col lock
   components/crt.css        CRT overlays: scanlines, glow, curvature, flicker
   lib/throttle.js           Browser baud throttle (Uint8Array)
-  lib/sfx.js                Web Audio CRT hum + degauss thunk
+  lib/sfx.js                Web Audio: CRT hum, degauss thunk, handshake playback
+  lib/modem.js              Per-baud handshake synthesizer (mirror of client's)
 ```
 
 ## Adding a menu item

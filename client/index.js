@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const WebSocket = require('ws');
 const { BaudThrottle } = require('./lib/throttle');
+const { synthHandshake, encodeWav } = require('./lib/modem');
 
 // ---- args ----------------------------------------------------------------
 
@@ -49,14 +52,18 @@ if (args.help) {
 
 // ---- dialer --------------------------------------------------------------
 
-const SOUND = path.join(__dirname, 'assets', 'dial-up.mp3');
-const MIN_DIAL_MS = args.noSound ? 0 : 3500;
+// The handshake is synthesized per baud; its real length gates the CONNECT
+// banner so the audio and the "connection" finish together.
+const handshake = args.noSound ? null : synthHandshake(args.baud);
+const MIN_DIAL_MS = handshake ? Math.round(handshake.duration * 1000) : 0;
 
 const hostLabel = args.url.replace(/^wss?:\/\//, '');
 const dialStart = Date.now();
 
 let audio = null;
+let wavPath = null;
 let dotTimer = null;
+const phaseTimers = [];
 let opened = false;
 let liveConnected = false;
 let hangingUp = false;
@@ -65,12 +72,25 @@ const pending = [];
 const throttle = new BaudThrottle({ baud: args.baud, sink: (b) => process.stdout.write(b) });
 
 function startDialAudio() {
-  if (args.noSound) return;
+  if (!handshake) return;
   try {
     const player = require('play-sound')({});
-    audio = player.play(SOUND, () => {});
+    wavPath = path.join(os.tmpdir(), `nodebbs-handshake-${process.pid}.wav`);
+    fs.writeFileSync(wavPath, encodeWav(handshake.samples, handshake.sampleRate));
+    audio = player.play(wavPath, () => cleanupWav());
   } catch (_) {
     // No audio backend available — carry on silently.
+  }
+}
+
+function cleanupWav() {
+  if (wavPath) {
+    try {
+      fs.unlinkSync(wavPath);
+    } catch (_) {
+      /* already gone */
+    }
+    wavPath = null;
   }
 }
 
@@ -83,6 +103,7 @@ function stopAudio() {
     }
     audio = null;
   }
+  cleanupWav();
 }
 
 function printDialIntro() {
@@ -94,10 +115,26 @@ function printDialIntro() {
   dotTimer = setInterval(() => process.stdout.write('.'), 350);
 }
 
+// Print handshake stage labels (RINGING, CARRIER DETECT, TRAINING…) in sync
+// with the audio timeline.
+function schedulePhaseText() {
+  if (!handshake) return;
+  for (const p of handshake.phases) {
+    if (!p.label) continue;
+    phaseTimers.push(setTimeout(() => process.stdout.write(`\r\n${p.label}`), Math.round(p.t * 1000)));
+  }
+}
+
+function clearPhaseTimers() {
+  for (const id of phaseTimers) clearTimeout(id);
+  phaseTimers.length = 0;
+}
+
 // ---- connection ----------------------------------------------------------
 
 printDialIntro();
 startDialAudio();
+schedulePhaseText();
 
 const ws = new WebSocket(args.url);
 
@@ -117,6 +154,7 @@ ws.on('close', () => hangup('NO CARRIER'));
 ws.on('error', (err) => {
   if (!opened) {
     if (dotTimer) clearInterval(dotTimer);
+    clearPhaseTimers();
     stopAudio();
     process.stdout.write(`\r\n\r\nNO ANSWER — ${err.code || err.message}\r\n`);
     process.exit(1);
@@ -134,6 +172,7 @@ function goLive() {
   if (liveConnected || hangingUp) return;
   liveConnected = true;
   if (dotTimer) clearInterval(dotTimer);
+  clearPhaseTimers();
   stopAudio();
 
   const speed = args.baud > 0 ? String(args.baud) : 'FAST';
@@ -182,6 +221,7 @@ function hangup(msg) {
   if (hangingUp) return;
   hangingUp = true;
   if (dotTimer) clearInterval(dotTimer);
+  clearPhaseTimers();
   throttle.flush();
   stopAudio();
   try {

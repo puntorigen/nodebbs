@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 import './crt.css';
 import { BaudThrottle } from '@/lib/throttle';
 import { createCrtSfx } from '@/lib/sfx';
+import { synthHandshake } from '@/lib/modem';
 
 const TERM_FONT = "'DejaVu Sans Mono','Menlo','Consolas','Liberation Mono',monospace";
 
@@ -47,16 +48,24 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
     let ws = null;
     let resizeObs = null;
     let dotTimer = null;
-    let audio = null;
     let sfx = null;
+    const phaseTimers = [];
 
     let opened = false;
     let live = false;
     let hangingUp = false;
     const pending = [];
     const enc = new TextEncoder();
-    const MIN_DIAL_MS = sound ? 3500 : 600;
+    // The synthesized handshake's real length gates the CONNECT banner so the
+    // audio and the "connection" finish together. Longer bauds = more drama.
+    const handshake = sound ? synthHandshake(baud) : null;
+    const MIN_DIAL_MS = handshake ? Math.round(handshake.duration * 1000) : 600;
     const dialStart = Date.now();
+
+    function clearPhaseTimers() {
+      for (const id of phaseTimers) clearTimeout(id);
+      phaseTimers.length = 0;
+    }
 
     const throttle = new BaudThrottle({
       baud,
@@ -107,14 +116,8 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
         clearInterval(dotTimer);
         dotTimer = null;
       }
-      if (audio) {
-        try {
-          audio.pause();
-          audio.currentTime = 0;
-        } catch (_) {
-          /* ignore */
-        }
-      }
+      clearPhaseTimers();
+      if (sfx) sfx.stopHandshake();
       const speed = baud > 0 ? String(baud) : 'FAST';
       term.write(`\r\nCONNECT ${speed}\r\n`);
       status(`CONNECT ${speed}`);
@@ -147,13 +150,7 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
         clearInterval(dotTimer);
         dotTimer = null;
       }
-      if (audio) {
-        try {
-          audio.pause();
-        } catch (_) {
-          /* ignore */
-        }
-      }
+      clearPhaseTimers();
       if (term) term.write(`\r\n\r\n\x1b[1;31m${msg}\x1b[0m\r\n`);
       status(msg);
       if (sfx) sfx.stop();
@@ -200,12 +197,16 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
         // Tube powers on: degauss thunk + steady hum.
         sfx.thunk();
         sfx.startHum();
-        try {
-          audio = new Audio('/dial-up.mp3');
-          audio.volume = 0.55;
-          audio.play().catch(() => {});
-        } catch (_) {
-          /* audio blocked */
+        // Baud-dependent synthesized modem handshake, with stage labels
+        // (RINGING, CARRIER DETECT, TRAINING…) printed in sync with the audio.
+        sfx.playHandshake(handshake.samples, handshake.sampleRate);
+        for (const p of handshake.phases) {
+          if (!p.label) continue;
+          phaseTimers.push(
+            setTimeout(() => {
+              if (term && !live && !disposed) term.write(`\r\n${p.label}`);
+            }, Math.round(p.t * 1000))
+          );
         }
       }
 
@@ -237,15 +238,9 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
       disposed = true;
       hangingUp = true;
       if (dotTimer) clearInterval(dotTimer);
+      clearPhaseTimers();
       throttle.stop();
       if (resizeObs) resizeObs.disconnect();
-      if (audio) {
-        try {
-          audio.pause();
-        } catch (_) {
-          /* ignore */
-        }
-      }
       if (sfx) {
         try {
           sfx.stop();

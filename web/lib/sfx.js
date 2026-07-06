@@ -6,6 +6,7 @@ export function createCrtSfx() {
   let ctx = null;
   let hum = null;
   let whine = null;
+  let handshakeSrc = null;
 
   function ensure() {
     if (typeof window === 'undefined') return null;
@@ -21,6 +22,36 @@ export function createCrtSfx() {
   return {
     resume() {
       ensure();
+    },
+
+    // Play the synthesized modem handshake (Float32Array of PCM samples).
+    playHandshake(samples, sampleRate) {
+      const c = ensure();
+      if (!c) return;
+      this.stopHandshake();
+      const buf = c.createBuffer(1, samples.length, sampleRate);
+      buf.copyToChannel(samples, 0);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const gain = c.createGain();
+      gain.gain.value = 0.85;
+      src.connect(gain).connect(c.destination);
+      src.start();
+      src.onended = () => {
+        if (handshakeSrc === src) handshakeSrc = null;
+      };
+      handshakeSrc = src;
+    },
+
+    stopHandshake() {
+      if (handshakeSrc) {
+        try {
+          handshakeSrc.stop();
+        } catch (_) {
+          /* already stopped */
+        }
+        handshakeSrc = null;
+      }
     },
 
     // Deep, fast-decaying thump like a CRT degaussing at power-on.
@@ -64,6 +95,7 @@ export function createCrtSfx() {
     },
 
     stop() {
+      this.stopHandshake();
       try {
         if (hum) hum.stop();
       } catch (_) {
