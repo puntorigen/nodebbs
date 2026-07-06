@@ -1,2 +1,164 @@
 # nodebbs
-Create http based BBS servers that can be accessed with any terminal console and provide an interactive UI experience!
+
+Dial into an ANSI BBS from your terminal, like it's 1994.
+
+`nodebbs` is a two-part retro bulletin board system:
+
+- **server/** holds all the session logic and streams raw **ANSI/VT100 bytes** to callers over a WebSocket.
+- **client/** is a thin "modem": it plays a dial-up sound, throttles the incoming bytes to a **simulated baud rate**, and forwards your keystrokes back to the server.
+
+Because the server just streams bytes and the client just prints them, colored ASCII, cursor animations, live presence counts, and multi-user chat all work with no special client support.
+
+```mermaid
+flowchart LR
+    subgraph clientCli [Client CLI]
+        dialer[Dialer + modem sound]
+        throttle[Baud throttle]
+        stdinRaw[Raw stdin]
+    end
+    subgraph serverCli [Server]
+        ws[WebSocket server]
+        session[Session state machine]
+        screens[Screens + menu config]
+        chatHub[Chat hub + presence]
+        store[JSON user store]
+    end
+    dialer --> ws
+    ws -->|"raw ANSI bytes"| throttle --> term[Terminal stdout]
+    stdinRaw -->|"keystrokes"| ws --> session --> screens
+    session --- chatHub
+    session --- store
+```
+
+## Quick start
+
+Requires Node.js 18+.
+
+```bash
+# 1. install both packages
+npm run install:all
+
+# 2. start the BBS server (terminal 1)
+npm run server
+
+# 3. dial in from a client (terminal 2, or a friend's machine)
+npm run call
+```
+
+`npm run call` dials `ws://localhost:3000` at a simulated 2400 baud. To connect elsewhere or change speed, run the client directly:
+
+```bash
+node client/index.js ws://some-host:3000 --baud 9600
+node client/index.js localhost:3000 --no-sound   # skip dial-up sound + handshake delay
+node client/index.js --baud 0                     # full speed (no throttle)
+```
+
+While connected, press **Ctrl+]** (or Ctrl+C) to hang up. You'll get a satisfying `NO CARRIER`.
+
+### First call
+
+1. The animated logo plays — press any key.
+2. At `LOGIN:` type an existing handle, or type `NEW` to register (handle + password).
+3. You land in the Main Menu. Press the letter in `[brackets]` to pick an option:
+   `[C]` chat, `[G]` games, `[W]` who's online, `[X]` log off.
+
+Open a second client and log in as a different user to try multi-user chat and watch the "callers online" count change.
+
+## Configuration
+
+Edit [server/nodebbs.json](server/nodebbs.json):
+
+```json
+{
+  "name": "The Demo BBS",
+  "sysop": "Pablo",
+  "description": "A NodeJS ANSI BBS you dial into from your terminal",
+  "port": 3000,
+  "baudBanner": 2400,
+  "startScreen": "Welcome"
+}
+```
+
+User accounts are stored (with scrypt-hashed passwords) in `server/data/users.json`, created automatically on first signup.
+
+## How it's organized
+
+```
+server/src/
+  index.js          WebSocket server; one Session per caller
+  session.js        Per-caller state machine: output, key input, navigation
+  menu.config.js    Declarative menus (pure data)
+  art/index.js      ANSI block-font banners + animated welcome
+  lib/
+    ansi.js         Colors, cursor moves, boxes, centering
+    ansimate.js     Frame animation + typewriter (cancellable on keypress)
+    keys.js         Decodes raw bytes into key tokens (arrows, enter, etc.)
+    screen.js       defineScreen(): turns { art, enter, key, leave } into a screen
+    users.js        JSON user store, scrypt password hashing
+    chat.js         Global chat room: join/leave/broadcast + history
+    presence.js     Live session registry (online counts, who's online)
+  screens/
+    welcome.js login.js menu.js chat.js whosonline.js goodbye.js
+    games/hilo.js games/tictactoe.js
+
+client/
+  index.js          Dialer: modem sound, CONNECT banner, raw stdin bridge
+  lib/throttle.js   Baud-rate byte drainer (baud / 10 bytes per second)
+  assets/dial-up.mp3
+```
+
+## Adding a menu item
+
+Menus are just data in [server/menu.config.js](server/menu.config.js). Add an entry to any menu's `items`:
+
+```js
+{ key: 'N', label: 'My New Thing', screen: 'MyScreen' }   // go to a screen
+{ key: 'G', label: 'Game Room',    menu: 'games' }         // open another menu
+{ key: 'X', label: 'Log Off',      action: 'logoff' }      // built-in action
+```
+
+Add a whole new sub-menu by adding a new keyed object and pointing to it with `menu: 'yourId'`.
+
+## Adding a screen
+
+A screen is a small module built with `defineScreen`. `enter` renders; `key` handles one keystroke at a time; `leave` cleans up. Navigate with `session.goto('Name', data)`.
+
+```js
+// server/src/screens/myscreen.js
+const { defineScreen } = require('../lib/screen');
+const ansi = require('../lib/ansi');
+
+module.exports = defineScreen({
+  activity: 'My Screen',                 // shown in Who's Online
+  async enter(session) {
+    session.write(ansi.clear + ansi.color('Hello, ' + session.user.handle + '!\r\n', 'brightCyan'));
+    session.write('Press Q to go back.\r\n');
+  },
+  async key(session, key) {
+    if ((key.ch || '').toLowerCase() === 'q') session.goto('Menu', { id: 'main' });
+  },
+});
+```
+
+Register it in [server/src/screens/index.js](server/src/screens/index.js):
+
+```js
+MyScreen: require('./myscreen'),
+```
+
+Then point a menu item at it with `screen: 'MyScreen'`.
+
+Useful `session` helpers inside a screen:
+
+- `session.write(str)` / `session.writeln(str)` — send ANSI to the caller
+- `await session.readLine({ label, mask, max })` — classic line input (mask for passwords)
+- `await session.readKey()` — one keystroke (throws when the caller navigates away)
+- `session.cols` / `session.rows` — the caller's terminal size
+- `session.user` — the logged-in user, or `null`
+- `session.goto(name, data)` — navigate to another screen
+
+## Tips for great ANSI
+
+- Use `require('../lib/ansi')` helpers: `ansi.color(text, 'brightCyan')`, `ansi.moveTo(row, col)`, `ansi.center(text, width)`, `ansi.box(lines)`.
+- For animation, `require('../lib/ansimate')` gives `playFrames(session, frames, { fps })` and `typewriter(session, text)`, both cancellable when the caller presses a key.
+- Test at a real baud rate (`--baud 1200`) — it changes how animations feel.

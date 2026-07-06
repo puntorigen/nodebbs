@@ -1,22 +1,25 @@
 {
-  "name": "client",
-  "version": "1.0.0",
-  "description": "",
+  "name": "nodebbs-client",
+  "version": "2.0.0",
+  "description": "NodeBBS thin terminal client: dials a BBS with modem sound, throttles to a baud rate, streams ANSI",
   "main": "index.js",
-  "scripts": {
-    "start": "node index"
+  "bin": {
+    "nodebbs-call": "index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "bbs",
+    "ansi",
+    "modem",
+    "terminal",
+    "retro"
+  ],
+  "author": "Pablo Schaffner",
   "license": "ISC",
   "dependencies": {
-    "@babel/core": "^7.22.9",
-    "@babel/preset-env": "^7.22.9",
-    "@babel/preset-react": "^7.22.5",
-    "@babel/register": "^7.22.5",
-    "blessed": "^0.1.81",
-    "pcm": "^1.0.3",
-    "react": "^17.0.2",
-    "react-blessed": "^0.7.2"
+    "play-sound": "^1.1.6",
+    "ws": "^8.18.0"
   }
 }

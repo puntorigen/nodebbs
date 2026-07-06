@@ -1,41 +1,25 @@
 {
-  "name": "bbs-server",
-  "version": "1.0.0",
-  "description": "NodeBBS Server",
-  "main": "index.js",
-  "scripts": {
-    "dev": "npm run build && clear && node dist/bundle.js",
-    "start": "node dist/bundle.js",
-    "build": "webpack",
-    "postinstall": "patch-package"
+  "name": "nodebbs-server",
+  "version": "2.0.0",
+  "description": "NodeBBS server: streams raw ANSI over WebSocket to thin terminal clients",
+  "main": "src/index.js",
+  "bin": {
+    "nodebbs-server": "src/index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": [
+    "bbs",
+    "ansi",
+    "websocket",
+    "terminal",
+    "retro"
+  ],
+  "author": "Pablo Schaffner",
   "license": "ISC",
   "dependencies": {
-    "@babel/cli": "^7.22.9",
-    "@babel/preset-env": "^7.22.9",
-    "axios": "^1.4.0",
-    "babel-loader": "^9.1.3",
-    "babel-node": "^0.0.1-security",
-    "blessed": "^0.1.81",
-    "blessed-contrib": "^4.11.0",
-    "body-parser": "^1.20.2",
-    "deasync": "^0.1.28",
-    "express": "^4.18.2",
-    "lz-string": "^1.5.0",
-    "patch-package": "^8.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-element-to-jsx-string": "^15.0.0",
-    "react-jsx-parser": "^1.29.0",
-    "react-serialize": "^0.2.1",
-    "simple-encryptor": "^4.0.0",
-    "webpack": "^5.88.2",
-    "webpack-cli": "^5.1.4"
-  },
-  "devDependencies": {
-    "@babel/node": "^7.22.6",
-    "@babel/preset-react": "^7.22.5"
+    "ws": "^8.18.0"
   }
 }

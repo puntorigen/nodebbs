@@ -1,7 +1,8 @@
 {
-    "name": "The Demo BBS",
-    "sysop": "Pablo",
-    "description": "NodeJS based BBS server demo",
-    "startScreen": "Login",
-    "encrypted": "true"
+  "name": "The Demo BBS",
+  "sysop": "Pablo",
+  "description": "A NodeJS ANSI BBS you dial into from your terminal",
+  "port": 3000,
+  "baudBanner": 2400,
+  "startScreen": "Welcome"
 }

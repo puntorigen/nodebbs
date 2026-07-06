@@ -1,12 +1,21 @@
 {
-  "name": "bbs",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "nodebbs",
+  "version": "2.0.0",
+  "description": "Dial into an ANSI BBS from your terminal. Server streams raw ANSI over WebSocket; the client is a thin modem that plays dial-up sound and throttles to a baud rate.",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server start",
+    "call": "npm --prefix client start"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "keywords": [
+    "bbs",
+    "ansi",
+    "websocket",
+    "modem",
+    "terminal",
+    "retro"
+  ],
+  "author": "Pablo Schaffner",
+  "license": "ISC"
 }
