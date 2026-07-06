@@ -93,13 +93,43 @@ function synthHandshake(baud = 2400) {
     };
   };
 
-  // Lowpass-shaded white noise (the carrier "hiss").
+  // Lowpass-shaded white noise (line hiss / background floor).
   const hiss = (amp = 0.16, cutoff = 4500) => {
     let y = 0;
     const a = Math.exp((-2 * Math.PI * cutoff) / sr);
     return () => {
       y = a * y + (1 - a) * (rng() * 2 - 1);
       return y * amp * 6; // one-pole eats energy; compensate
+    };
+  };
+
+  // Scrambled-data carrier: pseudo-random QAM symbols on a carrier. This is
+  // the real "kshhhhh" of two modems training/exchanging data — bandpass
+  // energy centered on the carrier (raspy and granular), not smooth lowpass
+  // hiss. I/Q levels update at the symbol rate and slew between symbols
+  // (crude pulse shaping); a little top-end noise adds air.
+  const scramble = (fc, symbolRate, amp = 0.16) => {
+    let ph = 0;
+    const sPeriod = Math.max(1, Math.floor(sr / symbolRate));
+    let I = 0;
+    let Q = 0;
+    let tI = 0;
+    let tQ = 0;
+    let hp = 0;
+    let prev = 0;
+    return (k) => {
+      if (k % sPeriod === 0) {
+        tI = (Math.floor(rng() * 4) - 1.5) / 1.5; // 4-level ~ [-1,1]
+        tQ = (Math.floor(rng() * 4) - 1.5) / 1.5;
+      }
+      I += (tI - I) * 0.25;
+      Q += (tQ - Q) * 0.25;
+      ph += (2 * Math.PI * fc) / sr;
+      const qam = I * Math.cos(ph) - Q * Math.sin(ph);
+      const w = rng() * 2 - 1;
+      hp = 0.85 * (hp + w - prev); // highpass the noise for a bit of sparkle
+      prev = w;
+      return (qam * 0.9 + hp * 0.18) * amp;
     };
   };
 
@@ -147,7 +177,7 @@ function synthHandshake(baud = 2400) {
     phase('training', 'TRAINING');
     add(0.55, warble(600, 3000, 8, 0.17)); // S1 sequence
     add(0.75, warble(1200, 2400, 24, 0.18));
-    add(0.7, hiss(0.05, 3200));
+    add(0.7, scramble(1700, 1200, 0.16)); // scrambled data
   } else if (tier === 'v32') {
     phase('training', 'TRAINING');
     // Echo-canceller probing: clicks over a steady tone.
@@ -157,7 +187,7 @@ function synthHandshake(baud = 2400) {
       silence(0.14);
     }
     add(0.8, warble(650, 2900, 12, 0.17));
-    add(1.5, hiss(0.06, 4200));
+    add(1.5, scramble(1800, 2400, 0.17)); // scrambled data
   } else if (tier === 'v32bis') {
     phase('training', 'TRAINING');
     // Echo-canceller probing, as V.32…
@@ -169,8 +199,8 @@ function synthHandshake(baud = 2400) {
     // …then the iconic fast dual-tone "trill" everyone remembers…
     add(1.0, warble(1200, 2400, 30, 0.19));
     add(0.55, warble(1800, 3000, 45, 0.17));
-    // …and a longer scrambled-data training hiss.
-    add(1.9, hiss(0.065, 4600));
+    // …and the longer scrambled-data exchange.
+    add(1.9, scramble(1800, 2400, 0.18));
   } else {
     // v34 / "FULL": the famous long sequence.
     phase('training', 'NEGOTIATING');
@@ -183,9 +213,10 @@ function synthHandshake(baud = 2400) {
       silence(0.1);
     }
     phase('training2', 'TRAINING');
-    add(1.4, hiss(0.075, 5200));
-    add(1.6, hiss(0.05, 3600)); // level shift: equalizers settling
-    add(0.9, hiss(0.028, 2400)); // fading toward "connected" quiet
+    // Scrambled data with the carrier stepping down as equalizers settle.
+    add(1.4, scramble(1959, 3200, 0.19));
+    add(1.6, scramble(1829, 2743, 0.14)); // level shift
+    add(0.9, scramble(1800, 2400, 0.08)); // fading toward "connected" quiet
   }
 
   silence(0.15);

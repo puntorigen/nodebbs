@@ -93,6 +93,34 @@ export function synthHandshake(baud = 2400) {
     };
   };
 
+  // Scrambled-data carrier: pseudo-random QAM symbols on a carrier — the real
+  // "kshhhhh" of two modems training (bandpass energy around the carrier),
+  // not smooth lowpass hiss. See client/lib/modem.js for the full comment.
+  const scramble = (fc, symbolRate, amp = 0.16) => {
+    let ph = 0;
+    const sPeriod = Math.max(1, Math.floor(sr / symbolRate));
+    let I = 0;
+    let Q = 0;
+    let tI = 0;
+    let tQ = 0;
+    let hp = 0;
+    let prev = 0;
+    return (k) => {
+      if (k % sPeriod === 0) {
+        tI = (Math.floor(rng() * 4) - 1.5) / 1.5;
+        tQ = (Math.floor(rng() * 4) - 1.5) / 1.5;
+      }
+      I += (tI - I) * 0.25;
+      Q += (tQ - Q) * 0.25;
+      ph += (2 * Math.PI * fc) / sr;
+      const qam = I * Math.cos(ph) - Q * Math.sin(ph);
+      const w = rng() * 2 - 1;
+      hp = 0.85 * (hp + w - prev);
+      prev = w;
+      return (qam * 0.9 + hp * 0.18) * amp;
+    };
+  };
+
   const click = (amp = 0.3) => (k) => {
     const env = Math.exp(-k / (sr * 0.004));
     return (rng() * 2 - 1) * amp * env;
@@ -131,7 +159,7 @@ export function synthHandshake(baud = 2400) {
     phase('training', 'TRAINING');
     add(0.55, warble(600, 3000, 8, 0.17));
     add(0.75, warble(1200, 2400, 24, 0.18));
-    add(0.7, hiss(0.05, 3200));
+    add(0.7, scramble(1700, 1200, 0.16));
   } else if (tier === 'v32') {
     phase('training', 'TRAINING');
     add(0.4, tone([1800], 0.16));
@@ -140,7 +168,7 @@ export function synthHandshake(baud = 2400) {
       silence(0.14);
     }
     add(0.8, warble(650, 2900, 12, 0.17));
-    add(1.5, hiss(0.06, 4200));
+    add(1.5, scramble(1800, 2400, 0.17));
   } else if (tier === 'v32bis') {
     phase('training', 'TRAINING');
     add(0.4, tone([1800], 0.16));
@@ -150,7 +178,7 @@ export function synthHandshake(baud = 2400) {
     }
     add(1.0, warble(1200, 2400, 30, 0.19));
     add(0.55, warble(1800, 3000, 45, 0.17));
-    add(1.9, hiss(0.065, 4600));
+    add(1.9, scramble(1800, 2400, 0.18));
   } else {
     phase('training', 'NEGOTIATING');
     add(0.5, (k) => Math.sin((2 * Math.PI * 2130 * k) / sr) * 0.24 * Math.exp(-k / (sr * 0.35)));
@@ -161,9 +189,9 @@ export function synthHandshake(baud = 2400) {
       silence(0.1);
     }
     phase('training2', 'TRAINING');
-    add(1.4, hiss(0.075, 5200));
-    add(1.6, hiss(0.05, 3600));
-    add(0.9, hiss(0.028, 2400));
+    add(1.4, scramble(1959, 3200, 0.19));
+    add(1.6, scramble(1829, 2743, 0.14));
+    add(0.9, scramble(1800, 2400, 0.08));
   }
 
   silence(0.15);
