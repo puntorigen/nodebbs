@@ -2,6 +2,10 @@
 
 Dial into an ANSI BBS from your terminal, like it's 1994.
 
+![NodeBBS web client: dialing in, the animated welcome, login, main menu, Who's Online, and a game — all inside a simulated CRT monitor](docs/demo.gif)
+
+> The browser client (`web/`) dialing into the BBS at 9600 baud: modem handshake, color-cycling ANSI welcome, signup, main menu, Who's Online, a round of Hi-Lo, and the `NO CARRIER` power-off — wrapped in a CRT monitor with scanlines and phosphor glow.
+
 `nodebbs` is a retro bulletin board system in three parts:
 
 - **server/** holds all the session logic and streams raw **ANSI/VT100 bytes** to callers over a WebSocket.
