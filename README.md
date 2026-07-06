@@ -2,12 +2,13 @@
 
 Dial into an ANSI BBS from your terminal, like it's 1994.
 
-`nodebbs` is a two-part retro bulletin board system:
+`nodebbs` is a retro bulletin board system in three parts:
 
 - **server/** holds all the session logic and streams raw **ANSI/VT100 bytes** to callers over a WebSocket.
-- **client/** is a thin "modem": it plays a dial-up sound, throttles the incoming bytes to a **simulated baud rate**, and forwards your keystrokes back to the server.
+- **client/** is a thin CLI "modem": it plays a dial-up sound, throttles the incoming bytes to a **simulated baud rate**, and forwards your keystrokes back to the server.
+- **web/** is a Next.js browser client (deployable to Vercel) that renders the same stream in an `xterm.js` terminal wrapped in a **CRT monitor** — scanlines, phosphor glow, curvature, flicker, and synthesized tube hum + degauss thunk.
 
-Because the server just streams bytes and the client just prints them, colored ASCII, cursor animations, live presence counts, and multi-user chat all work with no special client support.
+Because the server just streams bytes and each client just prints them, colored ASCII, cursor animations, live presence counts, and multi-user chat all work with no special client support.
 
 ```mermaid
 flowchart LR
@@ -64,6 +65,34 @@ While connected, press **Ctrl+]** (or Ctrl+C) to hang up. You'll get a satisfyin
 
 Open a second client and log in as a different user to try multi-user chat and watch the "callers online" count change.
 
+## Web client (browser + CRT)
+
+The [web/](web) app is a Next.js (App Router) client that connects to the same WebSocket server and renders the ANSI stream inside a simulated CRT monitor. It keeps the terminal locked to a true **80 columns** (scaling the font to fit) so the server's ANSI art always lines up.
+
+Run it locally alongside the server:
+
+```bash
+cd web
+npm install
+npm run dev            # http://localhost:3001
+```
+
+Then open the page, set the **SERVER** field (defaults to `ws://localhost:3000`), pick a baud rate + modem sound, and hit **DIAL**. Use the **HANG UP** button to disconnect.
+
+### Deploy to Vercel
+
+The web client is a standard Next.js app and deploys to Vercel with no extra config:
+
+1. Point Vercel at the repo and set the **Root Directory** to `web/`.
+2. Add an environment variable so the dialer defaults to your public server instead of localhost:
+
+   ```
+   NEXT_PUBLIC_BBS_URL=wss://your-bbs-host.example.com
+   ```
+
+   Use `wss://` (TLS) — browsers block insecure `ws://` from an `https://` page. Callers can still override the target in the SERVER field at runtime.
+3. Deploy. The BBS server itself is a long-lived WebSocket process, so host it somewhere that keeps a socket open (a small VM, Fly.io, Railway, a container, etc.) — not on Vercel's serverless functions.
+
 ## Configuration
 
 Edit [server/nodebbs.json](server/nodebbs.json):
@@ -105,6 +134,14 @@ client/
   index.js          Dialer: modem sound, CONNECT banner, raw stdin bridge
   lib/throttle.js   Baud-rate byte drainer (baud / 10 bytes per second)
   assets/dial-up.mp3
+
+web/
+  app/page.js               Dialer UI (server/baud/sound) + connected view
+  app/layout.js globals.css Fonts, base theme, dialer/status-bar styling
+  components/CrtTerminal.js xterm bridge: WebSocket, baud throttle, 80-col lock
+  components/crt.css        CRT overlays: scanlines, glow, curvature, flicker
+  lib/throttle.js           Browser baud throttle (Uint8Array)
+  lib/sfx.js                Web Audio CRT hum + degauss thunk
 ```
 
 ## Adding a menu item

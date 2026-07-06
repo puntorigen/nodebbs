@@ -5,3 +5,8 @@ server/.DS_Store
 
 # Local BBS user database (created at runtime)
 server/data
+
+# Next.js web client build output
+web/.next
+web/out
+.next

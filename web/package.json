@@ -1,0 +1,21 @@
+{
+  "name": "nodebbs-web",
+  "version": "2.0.0",
+  "description": "NodeBBS web client: dial into an ANSI BBS from your browser, wrapped in a CRT monitor",
+  "private": true,
+  "author": "Pablo Schaffner",
+  "license": "ISC",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "next": "^16.2.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

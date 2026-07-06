@@ -1,0 +1,247 @@
+:root {
+  --phosphor: #33ff66;
+  --phosphor-dim: #1f9e3f;
+  --amber: #ffb000;
+  --bg: #05100a;
+  --bg-deep: #020806;
+  --ui-font: 'VT323', 'Courier New', monospace;
+  --term-font: 'DejaVu Sans Mono', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: radial-gradient(circle at 50% 40%, #0a1a12 0%, var(--bg-deep) 100%);
+  color: var(--phosphor);
+  font-family: var(--ui-font);
+  overflow: hidden;
+}
+
+#__next,
+body > div {
+  height: 100%;
+}
+
+button {
+  font-family: var(--ui-font);
+  cursor: pointer;
+}
+
+/* ---- Dialer screen ---- */
+
+.dialer {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialer-panel {
+  width: min(560px, 92vw);
+  border: 2px solid var(--phosphor-dim);
+  border-radius: 10px;
+  padding: 28px 32px 32px;
+  background: rgba(4, 20, 12, 0.75);
+  box-shadow: 0 0 40px rgba(51, 255, 102, 0.15), inset 0 0 30px rgba(51, 255, 102, 0.06);
+  text-shadow: 0 0 6px rgba(51, 255, 102, 0.5);
+}
+
+.dialer-title {
+  font-size: 56px;
+  line-height: 0.95;
+  letter-spacing: 2px;
+  margin: 0 0 4px;
+  color: var(--phosphor);
+}
+
+.dialer-sub {
+  font-size: 22px;
+  color: var(--phosphor-dim);
+  margin: 0 0 24px;
+}
+
+.field {
+  margin-bottom: 18px;
+}
+
+.field label {
+  display: block;
+  font-size: 20px;
+  color: var(--amber);
+  text-shadow: 0 0 6px rgba(255, 176, 0, 0.4);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+
+.field input[type='text'] {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 22px;
+  padding: 8px 12px;
+  background: var(--bg-deep);
+  border: 1px solid var(--phosphor-dim);
+  border-radius: 4px;
+  color: var(--phosphor);
+  outline: none;
+}
+
+.field input[type='text']:focus {
+  border-color: var(--phosphor);
+  box-shadow: 0 0 8px rgba(51, 255, 102, 0.4);
+}
+
+.baud-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.baud-chip {
+  font-size: 20px;
+  padding: 4px 14px;
+  background: var(--bg-deep);
+  border: 1px solid var(--phosphor-dim);
+  border-radius: 999px;
+  color: var(--phosphor-dim);
+  transition: all 0.12s ease;
+}
+
+.baud-chip.active {
+  color: var(--bg-deep);
+  background: var(--phosphor);
+  border-color: var(--phosphor);
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.5);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  color: var(--phosphor);
+}
+
+.dial-btn {
+  margin-top: 26px;
+  width: 100%;
+  font-size: 30px;
+  letter-spacing: 3px;
+  padding: 12px;
+  background: var(--phosphor);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 0 22px rgba(51, 255, 102, 0.55);
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+}
+
+.dial-btn:hover {
+  box-shadow: 0 0 34px rgba(51, 255, 102, 0.8);
+}
+
+.dial-btn:active {
+  transform: scale(0.98);
+}
+
+.dialer-hint {
+  margin-top: 18px;
+  font-size: 17px;
+  color: var(--phosphor-dim);
+  line-height: 1.35;
+}
+
+/* ---- Connected screen ---- */
+
+.conn {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 10px;
+}
+
+.statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--phosphor-dim);
+  border-radius: 8px;
+  background: rgba(4, 20, 12, 0.7);
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+
+.sb-left {
+  color: var(--phosphor-dim);
+}
+
+.sb-status {
+  flex: 1 1 auto;
+  text-align: center;
+  text-shadow: 0 0 8px currentColor;
+}
+
+.sb-status.live {
+  color: var(--phosphor);
+}
+
+.sb-status.lost {
+  color: #ff5f56;
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.35; }
+}
+
+.sb-btn {
+  flex: 0 0 auto;
+  font-size: 20px;
+  letter-spacing: 2px;
+  padding: 4px 18px;
+  background: transparent;
+  border: 1px solid #ff5f56;
+  color: #ff8a80;
+  border-radius: 6px;
+  text-shadow: 0 0 6px rgba(255, 95, 86, 0.5);
+  transition: all 0.12s ease;
+}
+
+.sb-btn:hover {
+  background: #ff5f56;
+  color: #1a0605;
+  box-shadow: 0 0 16px rgba(255, 95, 86, 0.6);
+}
+
+/* The monitor bezel that frames the CRT tube. */
+.bezel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px;
+  border-radius: 26px;
+  background: linear-gradient(160deg, #2a2f2c 0%, #12100e 60%, #1c1a17 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.08),
+    inset 0 -6px 18px rgba(0, 0, 0, 0.7),
+    0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 640px) {
+  .bezel {
+    padding: 8px;
+    border-radius: 16px;
+  }
+  .statusbar {
+    font-size: 16px;
+    gap: 8px;
+  }
+}

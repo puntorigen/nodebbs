@@ -56,22 +56,28 @@ const art = {
     const name = session.meta.name || 'NodeBBS';
     const sub = session.meta.description || '';
 
-    const frames = CYCLE.map((c) => {
+    // Every frame has identical geometry (only the banner color changes), so we
+    // redraw in place from cursor-home instead of clearing the screen each tick.
+    // Clearing per frame makes the whole screen blank-then-repaint (bad flicker,
+    // especially under baud throttling). Overwriting in place is smooth.
+    const frameBody = (color) => {
       let f = '\r\n\r\n';
-      f += centerBlock(lines, width, c) + '\r\n\r\n';
+      f += centerBlock(lines, width, color) + '\r\n\r\n';
       f += ansi.center(ansi.color('· ' + name + ' ·', 'brightWhite'), width) + '\r\n';
       if (sub) f += ansi.center(ansi.color(sub, 'gray'), width) + '\r\n';
       return f;
-    });
+    };
+    const frames = CYCLE.map((c) => frameBody(c));
+
+    // Clear once up front and hide the cursor for the duration of the animation.
+    session.write(ansi.clear + ansi.hideCursor);
 
     const { playFrames } = require('../lib/ansimate');
-    await playFrames(session, frames, { fps: 5, loops: 2, clearBetween: true });
+    await playFrames(session, frames, { fps: 5, loops: 2, clearBetween: false, home: true });
 
-    // Settle on a final frame + prompt.
-    let final = ansi.clear + '\r\n\r\n';
-    final += centerBlock(lines, width, 'brightCyan') + '\r\n\r\n';
-    final += ansi.center(ansi.color('· ' + name + ' ·', 'brightWhite'), width) + '\r\n';
-    if (sub) final += ansi.center(ansi.color(sub, 'gray'), width) + '\r\n';
+    // Settle on a final frame + prompt, overwriting in place from cursor-home.
+    let final = ansi.home;
+    final += frameBody('brightCyan');
     final += '\r\n\r\n';
     final += ansi.center(ansi.blink(ansi.color('-=[ PRESS ANY KEY TO CONNECT ]=-', 'brightGreen')), width);
     session.write(final);
