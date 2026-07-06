@@ -107,10 +107,11 @@ Edit [server/nodebbs.json](server/nodebbs.json):
   "sysop": "Pablo",
   "description": "A NodeJS ANSI BBS you dial into from your terminal",
   "port": 3000,
-  "baudBanner": 2400,
   "startScreen": "Welcome"
 }
 ```
+
+`name`, `sysop`, and `description` show up on the banners/menus; `startScreen` is the screen every caller lands on first. `port` can be overridden with the `PORT` environment variable (e.g. `PORT=8080 npm run server`). Connection speed isn't set here — each caller picks their own simulated baud in the client (the CLI's `--baud` flag or the web dialer).
 
 User accounts are stored (with scrypt-hashed passwords) in `server/data/users.json`, created automatically on first signup.
 
