@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 const CrtTerminal = dynamic(() => import('@/components/CrtTerminal'), { ssr: false });
 
-const BAUDS = [300, 1200, 2400, 9600, 0];
+const BAUDS = [300, 1200, 2400, 9600, 14400, 0];
 const baudLabel = (b) => (b === 0 ? 'FULL' : String(b));
 
 const DEFAULT_URL = process.env.NEXT_PUBLIC_BBS_URL || 'ws://localhost:3000';

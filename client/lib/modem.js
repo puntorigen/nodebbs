@@ -15,6 +15,8 @@
 //   1200   Bell 212A  scrambled-data warble               (~6s)
 //   2400   V.22bis    S1 training warble + scramble       (~6.5s)
 //   9600   V.32       echo-probe clicks + training noise  (~7.5s)
+//   14400  V.32bis    echo probe + iconic fast dual-tone
+//                     trill + long scrambled training     (~9.5s)
 //   0/full V.34/V.90  the full drama: bong, dual-tone
 //                     probing, long hiss fading out       (~9.5s)
 
@@ -45,11 +47,12 @@ const DTMF = {
 
 function tierFor(baud) {
   const b = Number(baud) || 0;
-  if (b === 0 || b > 9600) return 'v34';
+  if (b === 0 || b > 14400) return 'v34';
   if (b <= 300) return 'bell103';
   if (b <= 1200) return 'bell212';
   if (b <= 2400) return 'v22bis';
-  return 'v32';
+  if (b <= 9600) return 'v32';
+  return 'v32bis';
 }
 
 function synthHandshake(baud = 2400) {
@@ -155,6 +158,19 @@ function synthHandshake(baud = 2400) {
     }
     add(0.8, warble(650, 2900, 12, 0.17));
     add(1.5, hiss(0.06, 4200));
+  } else if (tier === 'v32bis') {
+    phase('training', 'TRAINING');
+    // Echo-canceller probing, as V.32…
+    add(0.4, tone([1800], 0.16));
+    for (let i = 0; i < 3; i++) {
+      add(0.05, click(0.35));
+      silence(0.12);
+    }
+    // …then the iconic fast dual-tone "trill" everyone remembers…
+    add(1.0, warble(1200, 2400, 30, 0.19));
+    add(0.55, warble(1800, 3000, 45, 0.17));
+    // …and a longer scrambled-data training hiss.
+    add(1.9, hiss(0.065, 4600));
   } else {
     // v34 / "FULL": the famous long sequence.
     phase('training', 'NEGOTIATING');

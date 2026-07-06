@@ -60,7 +60,7 @@ node client/index.js --baud 0                     # full speed (no throttle)
 
 While connected, press **Ctrl+]** (or Ctrl+C) to hang up. You'll get a satisfying `NO CARRIER`.
 
-The dial-up sound isn't a recording — it's synthesized per baud, modeled on the real standards, and the `CONNECT` banner lands when the handshake finishes. 300 baud (Bell 103) is short and pure; 1200/2400 add scramble and training warbles; 9600 (V.32) adds echo-canceller probing; `--baud 0` gets the full V.34-style drama with the long training hiss.
+The dial-up sound isn't a recording — it's synthesized per baud, modeled on the real standards, and the `CONNECT` banner lands when the handshake finishes. 300 baud (Bell 103) is short and pure; 1200/2400 add scramble and training warbles; 9600 (V.32) adds echo-canceller probing; 14400 (V.32bis) throws in the iconic fast dual-tone trill everyone remembers; `--baud 0` gets the full V.34-style drama with the long training hiss.
 
 ### First call
 

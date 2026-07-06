@@ -14,6 +14,7 @@
 //   1200   Bell 212A  scrambled-data warble
 //   2400   V.22bis    S1 training warble + scramble
 //   9600   V.32       echo-probe clicks + training noise
+//   14400  V.32bis    echo probe + iconic fast dual-tone trill
 //   0/full V.34/V.90  bong, dual-tone probing, long hiss
 
 export const SAMPLE_RATE = 44100;
@@ -41,11 +42,12 @@ const DTMF = {
 
 function tierFor(baud) {
   const b = Number(baud) || 0;
-  if (b === 0 || b > 9600) return 'v34';
+  if (b === 0 || b > 14400) return 'v34';
   if (b <= 300) return 'bell103';
   if (b <= 1200) return 'bell212';
   if (b <= 2400) return 'v22bis';
-  return 'v32';
+  if (b <= 9600) return 'v32';
+  return 'v32bis';
 }
 
 export function synthHandshake(baud = 2400) {
@@ -139,6 +141,16 @@ export function synthHandshake(baud = 2400) {
     }
     add(0.8, warble(650, 2900, 12, 0.17));
     add(1.5, hiss(0.06, 4200));
+  } else if (tier === 'v32bis') {
+    phase('training', 'TRAINING');
+    add(0.4, tone([1800], 0.16));
+    for (let i = 0; i < 3; i++) {
+      add(0.05, click(0.35));
+      silence(0.12);
+    }
+    add(1.0, warble(1200, 2400, 30, 0.19));
+    add(0.55, warble(1800, 3000, 45, 0.17));
+    add(1.9, hiss(0.065, 4600));
   } else {
     phase('training', 'NEGOTIATING');
     add(0.5, (k) => Math.sin((2 * Math.PI * 2130 * k) / sr) * 0.24 * Math.exp(-k / (sr * 0.35)));
