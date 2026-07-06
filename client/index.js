@@ -11,11 +11,13 @@ const { synthHandshake, encodeWav } = require('./lib/modem');
 // ---- args ----------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { url: 'ws://localhost:3000', baud: 2400, noSound: false, help: false };
+  const args = { url: 'ws://localhost:3000', baud: 2400, noSound: false, help: false, audio: false, robust: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--no-sound') args.noSound = true;
+    else if (a === '--audio') args.audio = true;
+    else if (a === '--robust') args.robust = true;
     else if (a === '--baud') args.baud = parseInt(argv[++i], 10) || 0;
     else if (a.startsWith('--baud=')) args.baud = parseInt(a.split('=')[1], 10) || 0;
     else if (!a.startsWith('-')) args.url = a;
@@ -36,6 +38,9 @@ function help() {
       'Options:',
       '  --baud <n>    Simulated modem speed (default 2400). 0 = full speed.',
       '  --no-sound    Skip the dial-up sound and handshake delay.',
+      '  --audio       Dial over sound (speaker + mic) instead of the internet.',
+      '                Needs a server started with --audio, and sox installed.',
+      '  --robust      With --audio: enable FEC for noisy rooms (slower).',
       '  -h, --help    Show this help.',
       '',
       'While connected: press Ctrl+] (or Ctrl+C) to hang up.',
@@ -49,6 +54,76 @@ if (args.help) {
   help();
   process.exit(0);
 }
+
+// ---- acoustic dialer (opt-in via --audio) --------------------------------
+
+if (args.audio) {
+  runAudio();
+} else {
+  runWebSocket();
+}
+
+function runAudio() {
+  const { AudioModemClient } = require('./lib/audio-modem');
+
+  let live = false;
+  let ending = false;
+  let modem = null;
+
+  process.stdout.write('\x1b[2J\x1b[H');
+  process.stdout.write('NodeBBS Terminal Client — ACOUSTIC MODE\r\n');
+  process.stdout.write('(press Ctrl+] to hang up)\r\n\r\n');
+  process.stdout.write('ATDT (over the air)\r\n');
+
+  const stdin = process.stdin;
+  function bindTerminal() {
+    if (stdin.isTTY) stdin.setRawMode(true);
+    stdin.resume();
+    stdin.on('data', (buf) => {
+      if (buf.length === 1 && (buf[0] === 0x1d || buf[0] === 0x03)) {
+        end('NO CARRIER (you hung up)', () => modem && modem.hangup());
+        return;
+      }
+      if (modem) modem.sendInput(buf);
+    });
+  }
+
+  function end(msg, action) {
+    if (ending) return;
+    ending = true;
+    if (action) action();
+    else if (modem) modem.stop();
+    process.stdout.write('\x1b[r\x1b[?25h');
+    if (stdin.isTTY) {
+      try {
+        stdin.setRawMode(false);
+      } catch (_) {
+        /* not a tty */
+      }
+    }
+    process.stdout.write(`\r\n\r\n${msg}\r\n`);
+    setTimeout(() => process.exit(0), 120);
+  }
+
+  modem = new AudioModemClient({
+    robust: args.robust,
+    onStatus: (label) => process.stdout.write(`\r\n${label}`),
+    onData: (bytes) => process.stdout.write(bytes),
+    onConnect: () => {
+      if (live) return;
+      live = true;
+      process.stdout.write('\r\n');
+      bindTerminal();
+    },
+    onNoCarrier: (reason) => end(reason),
+  });
+  modem.start();
+
+  process.on('SIGTERM', () => end('NO CARRIER', () => modem && modem.hangup()));
+  return;
+}
+
+function runWebSocket() {
 
 // ---- dialer --------------------------------------------------------------
 
@@ -235,3 +310,5 @@ function hangup(msg) {
 }
 
 process.on('SIGTERM', () => hangup('NO CARRIER'));
+
+} // end runWebSocket

@@ -157,6 +157,15 @@ button {
   line-height: 1.35;
 }
 
+.dialer-hint code {
+  font-family: var(--term-font);
+  font-size: 14px;
+  color: var(--phosphor);
+  background: rgba(51, 255, 102, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* ---- Connected screen ---- */
 
 .conn {

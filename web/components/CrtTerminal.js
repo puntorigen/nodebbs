@@ -6,6 +6,7 @@ import './crt.css';
 import { BaudThrottle } from '@/lib/throttle';
 import { createCrtSfx } from '@/lib/sfx';
 import { synthHandshake } from '@/lib/modem';
+import { createTransport } from '@/lib/transport';
 
 const TERM_FONT = "'DejaVu Sans Mono','Menlo','Consolas','Liberation Mono',monospace";
 
@@ -37,7 +38,13 @@ function hostLabel(url) {
   return String(url).replace(/^wss?:\/\//, '');
 }
 
-export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
+function dialTarget(line, url) {
+  if (line === 'phone') return 'ACOUSTIC LINE';
+  if (line === 'loopback') return 'LOOPBACK (DSP SELF-TEST)';
+  return hostLabel(url);
+}
+
+export default function CrtTerminal({ url, baud, sound, line = 'internet', robust = false, onStatus, onClosed }) {
   const hostRef = useRef(null);
   const screenRef = useRef(null);
 
@@ -45,20 +52,26 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
     let disposed = false;
     let term = null;
     let fitAddon = null;
-    let ws = null;
+    let transport = null;
     let resizeObs = null;
     let dotTimer = null;
     let sfx = null;
     const phaseTimers = [];
 
-    let opened = false;
+    const isAudio = line === 'phone' || line === 'loopback';
     let live = false;
     let hangingUp = false;
     const pending = [];
     const enc = new TextEncoder();
-    // The synthesized handshake's real length gates the CONNECT banner so the
-    // audio and the "connection" finish together. Longer bauds = more drama.
-    const handshake = sound ? synthHandshake(baud) : null;
+    // Over a real (or looped-back) acoustic line the channel *is* the throttle
+    // at ~30 B/s, so let bytes through at full speed; only the INTERNET line
+    // simulates a baud rate for period-correct redraw pacing.
+    const effBaud = isAudio ? 0 : baud;
+    // On the INTERNET line the synthesized handshake's length gates the CONNECT
+    // banner so audio and "connection" finish together. The acoustic lines are
+    // event-driven (the modem reports CONNECT), so no gate is used there.
+    const useHandshake = sound && line === 'internet';
+    const handshake = useHandshake ? synthHandshake(baud) : null;
     const MIN_DIAL_MS = handshake ? Math.round(handshake.duration * 1000) : 600;
     const dialStart = Date.now();
 
@@ -68,7 +81,7 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
     }
 
     const throttle = new BaudThrottle({
-      baud,
+      baud: effBaud,
       sink: (bytes) => {
         if (term) term.write(bytes);
       },
@@ -76,15 +89,8 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
 
     const status = (s) => onStatus && onStatus(s);
 
-    function sendSize(t, cols, rows) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ t, cols: cols || (term && term.cols) || 80, rows: rows || (term && term.rows) || 24 }));
-      }
-    }
-
     // Lock the terminal to a true 80-column BBS width by scaling the font so 80
-    // columns exactly span the container, then let rows fill the height. This
-    // keeps the browser view aligned with the server's 80-column ANSI art.
+    // columns exactly span the container, then let rows fill the height.
     const TARGET_COLS = 80;
     function fitTo80() {
       if (!term || !fitAddon) return;
@@ -118,11 +124,16 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
       }
       clearPhaseTimers();
       if (sfx) sfx.stopHandshake();
-      const speed = baud > 0 ? String(baud) : 'FAST';
-      term.write(`\r\nCONNECT ${speed}\r\n`);
-      status(`CONNECT ${speed}`);
+      if (line === 'internet') {
+        const speed = baud > 0 ? String(baud) : 'FAST';
+        term.write(`\r\nCONNECT ${speed}\r\n`);
+        status(`CONNECT ${speed}`);
+      } else {
+        // The acoustic modem already printed its CONNECT banner via onStatus.
+        term.write('\r\n');
+      }
       fitTo80();
-      sendSize('hello', term.cols, term.rows);
+      transport.sendControl('hello', term.cols, term.rows);
       for (const c of pending) throttle.push(c);
       pending.length = 0;
       term.focus();
@@ -186,7 +197,7 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
       term.write('\x1b[2J\x1b[H');
       term.write('NodeBBS Web Client\r\n');
       term.write('\x1b[2m(click HANG UP to disconnect)\x1b[0m\r\n\r\n');
-      term.write(`ATDT ${hostLabel(url)}\r\n`);
+      term.write(`ATDT ${dialTarget(line, url)}\r\n`);
       term.write('DIALING');
       dotTimer = setInterval(() => term && term.write('.'), 350);
       status('DIALING');
@@ -197,41 +208,46 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
         // Tube powers on: degauss thunk + steady hum.
         sfx.thunk();
         sfx.startHum();
-        // Baud-dependent synthesized modem handshake, with stage labels
-        // (RINGING, CARRIER DETECT, TRAINING…) printed in sync with the audio.
-        sfx.playHandshake(handshake.samples, handshake.sampleRate);
-        for (const p of handshake.phases) {
-          if (!p.label) continue;
-          phaseTimers.push(
-            setTimeout(() => {
-              if (term && !live && !disposed) term.write(`\r\n${p.label}`);
-            }, Math.round(p.t * 1000))
-          );
+        if (useHandshake) {
+          // Baud-dependent synthesized modem handshake, with stage labels
+          // (RINGING, CARRIER DETECT, TRAINING…) printed in sync with the audio.
+          sfx.playHandshake(handshake.samples, handshake.sampleRate);
+          for (const p of handshake.phases) {
+            if (!p.label) continue;
+            phaseTimers.push(
+              setTimeout(() => {
+                if (term && !live && !disposed) term.write(`\r\n${p.label}`);
+              }, Math.round(p.t * 1000))
+            );
+          }
         }
       }
 
       resizeObs = new ResizeObserver(() => fitTo80());
       resizeObs.observe(hostRef.current);
-      term.onResize(({ cols, rows }) => sendSize('size', cols, rows));
+      term.onResize(({ cols, rows }) => transport && transport.sendControl('size', cols, rows));
       term.onData((d) => {
-        if (live && ws && ws.readyState === WebSocket.OPEN) ws.send(enc.encode(d));
+        if (live && transport) transport.send(enc.encode(d));
       });
 
-      ws = new WebSocket(url);
-      ws.binaryType = 'arraybuffer';
-      ws.onopen = () => {
-        opened = true;
-        maybeGoLive();
+      transport = createTransport({ line, url, robust });
+      transport.onOpen = () => {
+        if (line === 'internet') maybeGoLive();
+        else goLive();
       };
-      ws.onmessage = (ev) => {
-        const chunk = typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data);
+      transport.onData = (chunk) => {
         if (live) throttle.push(chunk);
         else pending.push(chunk);
       };
-      ws.onclose = () => onCarrierLost();
-      ws.onerror = () => {
-        if (!opened) failDial('NO ANSWER');
+      transport.onClose = () => onCarrierLost();
+      transport.onStatus = (s) => {
+        status(s);
+        // On the acoustic lines, echo dial-progress banners into the terminal
+        // (the modem, not a synth soundtrack, is the source of truth here).
+        if (isAudio && term && !live) term.write(`\r\n${s}`);
       };
+      transport.onError = (msg) => failDial(msg);
+      transport.start();
     })();
 
     return () => {
@@ -248,9 +264,9 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
           /* ignore */
         }
       }
-      if (ws) {
+      if (transport) {
         try {
-          ws.close();
+          transport.close();
         } catch (_) {
           /* ignore */
         }
@@ -263,7 +279,7 @@ export default function CrtTerminal({ url, baud, sound, onStatus, onClosed }) {
         }
       }
     };
-  }, [url, baud, sound, onStatus, onClosed]);
+  }, [url, baud, sound, line, robust, onStatus, onClosed]);
 
   return (
     <div className="crt-screen powering" ref={screenRef}>
